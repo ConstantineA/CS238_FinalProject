@@ -44,7 +44,7 @@ for i in range(k):
         playerNumber = obs["action"]
         if (playerNumber >= 0):
             env.agents[playerNumber].sayHello(playerNumber)
-            env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
+            #env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
         
         print(obs)
 
