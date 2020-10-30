@@ -2,3 +2,6 @@
 
 # fschlatt files
 test/
+
+**/__pycache__/
+*.pyc
