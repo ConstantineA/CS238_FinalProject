@@ -51,7 +51,8 @@ class TestingRLOmahaAgent(base.BaseAgent):
     def getFeatures(self, obs):
         
         features = []
-        features.append(obs["pot"])
+        #features.append(obs["pot"])
+        features.append(1)
         playerNumber = obs["action"]
         features.append(obs["stacks"][playerNumber])
 
@@ -169,23 +170,29 @@ class TestingRLOmahaAgent(base.BaseAgent):
     def chooseAction(self,stateFeatures, actions):
         #INCORPORATE EPSIOLON GREEDY PROBABILITY; code is below
         maxQ = -math.inf
-        maxAction = -2 #corresponds to nothing
+        maxAction = 0 #corresponds to nothing
         for a in actions:
-           currTheta = self.thetas[a]
-           currQValue = np.dot(currTheta, stateFeatures)
-           if currQValue > maxQ:
-               maxQ = currQValue
-               maxAction = a
+            print(a)
+            currTheta = self.thetas[a]
+            print("currTheta",currTheta)
+            currQValue = np.dot(currTheta, stateFeatures)
+            print("currQvalue:",currQValue)
+            if currQValue > maxQ:
+                maxQ = currQValue
+                maxAction = a
         return maxAction
 
     def forwardRL(self,obs):
         #print("in forwardRL")
         actions = self.getActions(obs)
+        print(actions)
         #print("past getActions")
         currentStateFeatures = self.getFeatures(obs)
+        print(currentStateFeatures)
         #print("past get Features")
         self.previousStateFeatures = currentStateFeatures
         self.currBestAction = self.chooseAction(currentStateFeatures,actions)
+        
         #print("finished getting best action in forwardRL")
         print("current best action:", self.currBestAction)
         return self.currBestAction
