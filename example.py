@@ -33,7 +33,7 @@ print(obs["hole_cards"][0])
 #print(get_rank_class(obs["hole_cards"][0]))
 
 
-k = 5
+k = 1000
 
 for i in range(k):
     #print(obs)
@@ -43,16 +43,16 @@ for i in range(k):
 
         playerNumber = obs["action"]
         if (playerNumber >= 0):
-            env.agents[playerNumber].sayHello(playerNumber)
-            #env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
+            #env.agents[playerNumber].sayHello(playerNumber)
+            env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
         
-        print(obs)
+        #print(obs)
 
         #for (i, agent) in env.agents.items():
         #    if obs["action"] == i: #obs[action] is the player
          #       print(obs)
          #       agent.sayHello(i)
-        print("-------------------------")
+        #print("-------------------------")
             #print(rewards[i])
             #agent.setRewardandUpdate(rewards[i]) #i give it
             
@@ -66,10 +66,13 @@ for i in range(k):
         if all(done):
             break
 
-    print(i)
-    print("Current stack",obs["stacks"])
-    print("------")
-
+    #print(i)
+    #print("Current stack",obs["stacks"])
+    #print("------")
+    if (i == k-1): #the last iteration
+        print("Current stack",obs["stacks"])
     obs = env.reset()
+
+print("Current stack",obs["stacks"])
 
 

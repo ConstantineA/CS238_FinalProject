@@ -9,7 +9,23 @@ class TestingRLOmahaAgent(base.BaseAgent):
     def __init__(self):
         super().__init__()
 
-    
+    '''
+    #Gradient QLearning
+    actionSpace = [0,1,-1] #0 = call/check, #1 = max_raise, #-1 = fold
+    gamma = 
+
+
+    def forwardRL(obs):
+
+
+    def act(self, obs):
+        
+        if obs["action"] == 0: #player 1
+            return self.forwardRL(obs)
+        else:
+            return self.alwaysBetCall(obs)
+
+    '''
     #Actions are one of three things:
     #0) Call/check
     #1) Fold
@@ -34,26 +50,26 @@ class TestingRLOmahaAgent(base.BaseAgent):
 
     def getState(self,obs):
         featuresList = []
-        print("pot",obs["pot"])
+        #print("pot",obs["pot"])
         featuresList.extend(obs["community_cards"])
         featuresList.extend(obs["hole_cards"])
-        print(featuresList)
+        #print(featuresList)
         featuresList.append(obs["pot"])
-        print("pot",obs["pot"])
-        print(featuresList)
+        #print("pot",obs["pot"])
+        #print(featuresList)
 
         return featuresList
 
     def getQValue(self, state, a):
         #the tuple (state,a) is used as the key for the defaultdictionary
-        print("state:", state)
-        print("action:", a)
+        #print("state:", state)
+        #print("action:", a)
         state.append(a)
-        print("state with action:", state)
+        #print("state with action:", state)
         key = tuple(state)
-        print("key: ", key)
+        #print("key: ", key)
 
-        print("weights:", self.weights)
+        #print("weights:", self.weights)
         return self.weights[key]
 
 
@@ -79,23 +95,27 @@ class TestingRLOmahaAgent(base.BaseAgent):
         return self.currBestAction
 
 
-    def update(state, reward, sPrime, actions):
+    def update(self,state, reward, sPrime, actions, obs):
         newQ = 0
         for a in actions:
-            q = self.getQ(sPrime, a)
+            q = self.getQValue(sPrime, a)
             if q > newQ:
                 newQ = q
         #TAKE A LOOK AT THIS ALGORITHM, MIGHT BE WRONG
-        updateValue = self.alphaLearningRate * (reward + self.discount*(newQ - self.getQ(state,self.currBestAction)))
-        self.weights[self.getState(state,self.currBestAction)] += updateValue
+        updateValue = self.alphaLearningRate * (reward + self.discount*(newQ - self.getQValue(state,self.currBestAction)))
+        #self.weights[self.getState(state,self.currBestAction)] += updateValue
+        self.weights[tuple(self.getState(obs))] += updateValue
 
     def setRewardandUpdate(self, obs, reward):
-        print("weights:",self.weights)
+        #print("weights:",self.weights)
         sPrime = self.getState(obs)
         self.totalRewards += reward
         actions = self.getActions(obs)
-        self.update(self.oldState, reward, sPrime, actions)
-
+        #print("oldstate",self.oldState)
+        #print("reward",reward)
+        #print("sprime",sPrime)
+        #print("actions",actions)
+        self.update(self.oldState, reward, sPrime, actions, obs)
     '''
     def getActions(self,obs):
         #all of the possible actions include folding, calling, or raising
@@ -107,7 +127,7 @@ class TestingRLOmahaAgent(base.BaseAgent):
         #print(actions)
         #print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
         return actions
-
+    '''
     def getFeatures(self,obs):
         featuresList = []
         print(obs)
@@ -116,13 +136,6 @@ class TestingRLOmahaAgent(base.BaseAgent):
         featuresList.append(obs["pot"])
 
         return featuresList
-
-    def forwardRL(self,obs):
-        features = self.getFeatures(obs)
-        possibleActions = self.getActions(obs)
-        return -1
-    '''
-
    
 
     def reverseRL(self,obs):
@@ -154,17 +167,18 @@ class TestingRLOmahaAgent(base.BaseAgent):
         print("hello world, i'm agent number:", i)
 
     def act(self, obs):
-        '''
-        if obs["action"] == 0:
+        
+        
+        #if obs["action"] == 0:
+         #   return self.alwaysMaxRaise(obs)
+        #else:
+         #   return self.alwaysBetCall(obs)
 
-            return 5
-
-        return 5
-        '''
-        return self.alwaysBetCall(obs)
 
         
-        #if obs["action"] == 0: #player 1
-        #    return self.forwardRL(obs)
-        #return self.reverseRL(obs)
+        if obs["action"] == 0: #player 1
+            return self.forwardRL(obs)
+        else:
+            return self.alwaysBetCall(obs)
+
         
