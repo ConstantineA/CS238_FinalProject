@@ -33,18 +33,25 @@ print(obs["hole_cards"][0])
 #print(get_rank_class(obs["hole_cards"][0]))
 
 
-k = 1000
+k = 10
 
 for i in range(k):
+    print(i)
+    #print("in range of iterations")
     #print(obs)
     while True:
+        #print("inside while loop")
         bet = env.act(obs)
+        #print("just finished bet")
         obs, rewards, done, info = env.step(bet)
+        #print("just finished step")
 
         playerNumber = obs["action"]
-        if (playerNumber >= 0):
+        #print("playernumber:", playerNumber)
+        #if (playerNumber >= 0):
+         #   print("within rewardUpdate step")
             #env.agents[playerNumber].sayHello(playerNumber)
-            env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
+        env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
         
         #print(obs)
 

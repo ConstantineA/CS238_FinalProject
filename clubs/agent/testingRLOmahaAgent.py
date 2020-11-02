@@ -3,20 +3,213 @@ import random
 from . import base
 from collections import defaultdict
 import math
+import numpy as np
 
+
+STR_RANKS = "23456789TJQKA"
+INT_RANKS = list(range(13))
+RANK_DICT = dict(zip(list(STR_RANKS), INT_RANKS))
 
 class TestingRLOmahaAgent(base.BaseAgent):
     def __init__(self):
         super().__init__()
 
-    '''
     #Gradient QLearning
-    actionSpace = [0,1,-1] #0 = call/check, #1 = max_raise, #-1 = fold
-    gamma = 
+    #actionSpace = [0,1,-1] #0 = call/check, #1 = max_raise, #-1 = fold
+    gammaGlobal = 1
+    gradientQ = 1
+    thetaBetCheck = np.ones(119)
+    thetaMaxRaise = np.ones(119)
+    thetaFold = np.ones(119)
+    alphaLearningRate = 0.2
+
+    thetas = np.array([thetaBetCheck, thetaMaxRaise, thetaFold])
+    previousStateFeatures = 1/13*np.ones(119)
+    previousStateFeatures[0] = 0
+    previousStateFeatures[1] = 200
+    totalRewards = 0
+    currBestAction = 0 #initialize our first action to bet/check
+
+    def getActions(self,obs):
+        #[call/check, max_raise, fold]
+        #IMPLEMENT THIS LATER FOR COMPLEXITY
+        actions = []
+        actions.append(obs["call"])
+        actions.append(obs["max_raise"])
+        actions.append(-1)
+
+        actionsNew = [0,1,2] #[bet/check, max_raise, fold]
+        return actionsNew
+
+#MAKE THIS FUNCTION IN CARD.PY
+    def get_card_number(self,card):
+	    rank_str = card.__str__()[0]
+	    return RANK_DICT[rank_str]
 
 
-    def forwardRL(obs):
+#0 = 2; 1 = 3... pos 8 = 10, pos 9 = J, 10 = Q, 11 = K, 12 = Ace
+    def getFeatures(self, obs):
+        
+        features = []
+        features.append(obs["pot"])
+        playerNumber = obs["action"]
+        features.append(obs["stacks"][playerNumber])
 
+        #print("we've appended the pot, and stack")
+
+        #OUR FOUR HOLE CARDS
+        #First 4 vector features are for each hole card
+        if (not obs["hole_cards"]):
+            #print("no hole cards")
+            #don't have hole cards, we're completely blind
+            for i in range(52):
+                features.append(1/13)
+        else:
+            #print("we have hole cards")
+            for card in obs["hole_cards"]:
+                counter = 0
+                cardRank = self.get_card_number(card)
+                while counter < 13:
+                    counter += 1
+                    if counter == cardRank:
+                        features.append(1)
+                    else:
+                        features.append(0)
+
+        #OUR FIVE COMMUNITY CARDS
+        #print("setting community card features")
+        communityCounter = 0
+        for card in obs["community_cards"]:
+            #print(card)
+            communityCounter += 1
+
+            counter = 0
+            cardRank = self.get_card_number(card)
+            while counter < 13:
+                counter += 1
+                if counter == cardRank:
+                    features.append(1)
+                else:
+                    features.append(0)
+            
+        while communityCounter < 5:
+            communityCounter += 1
+            for i in range(13):
+                #This is where we incorporate possible probability changes based on what we've seen
+                #For now, ignore what we know from other hands
+                features.append(1/13)
+        
+        #print(len(features))
+        return np.array(features)
+        
+    def getOldQ(self):
+        prevAction = self.currBestAction #this is the previous action taken
+        prevStateFeatures = self.previousStateFeatures
+        theta = self.thetas[prevAction]
+        
+        #print("LOOK HERE------------------------------")
+        #print("self.thetas", self.thetas)
+        #print("slef.thetas[0]", self.thetas[0])
+        #print(theta)
+        #print(prevAction)
+
+        qVal = np.dot(theta,prevStateFeatures)
+        #print("the dot product: ")
+        #print("qval shape:", qVal.shape)
+        #print(theta.shape, prevStateFeatures.shape)
+        #print(self.thetas.shape)
+        return qVal
+
+    def gradFxn(self):
+        return self.previousStateFeatures
+
+
+
+    def update(self,a,r, obs):
+
+        #print("WE ARE UPDATing")
+        #return 5
+        #the observation is for sprime
+        
+        #actionSpace = self.getActions(obs) #maybe instead of using the actual number for action space....have arbitrary
+        #action values that correspond to check/bet, min_raise, min_raise +2, min_raise +4, ...max_raise, fold
+        #actionSpace = [0,1,2] #[bet/check, max_raise, fold]
+        gamma = self.gammaGlobal
+        featuresVector = self.getFeatures(obs)
+        alpha = self.alphaLearningRate
+
+        u = -math.inf
+        for a in self.getActions(obs):
+            currTheta = self.thetas[a]
+            currQValue = np.dot(currTheta, featuresVector)
+            if currQValue > u:
+                u = currQValue
+        
+        #print("reward:",r)
+        #print("gamma:",gamma)
+        #print("u:", u)
+        #print("old q value:",self.getOldQ())
+        left = (r + gamma * u - self.getOldQ())
+        #print("left",left)
+        #print(type(left))
+        #print("---------------------------")
+        #print(self.gradFxn())
+        #print(type(self.gradFxn()))
+        #print(left * self.gradFxn())
+        delta = left * self.gradFxn()
+        #delta = (r + gamma * u - self.getOldQ())*self.gradFxn()
+
+        #Our scaling for the gradient is so that all elements add to one
+        #ASK CHRIST ABOUT SCALING GRADIENT!!
+
+        toMultiply = np.min([1/np.linalg.norm(delta),1])*delta
+        self.thetas[a] += alpha * toMultiply
+    
+
+    def chooseAction(self,stateFeatures, actions):
+        #INCORPORATE EPSIOLON GREEDY PROBABILITY; code is below
+        maxQ = -math.inf
+        maxAction = -2 #corresponds to nothing
+        for a in actions:
+           currTheta = self.thetas[a]
+           currQValue = np.dot(currTheta, stateFeatures)
+           if currQValue > maxQ:
+               maxQ = currQValue
+               maxAction = a
+        return maxAction
+
+    def forwardRL(self,obs):
+        #print("in forwardRL")
+        actions = self.getActions(obs)
+        #print("past getActions")
+        currentStateFeatures = self.getFeatures(obs)
+        #print("past get Features")
+        self.previousStateFeatures = currentStateFeatures
+        self.currBestAction = self.chooseAction(currentStateFeatures,actions)
+        #print("finished getting best action in forwardRL")
+        print("current best action:", self.currBestAction)
+        return self.currBestAction
+
+    def setRewardandUpdate(self, obs, reward):
+        #print("weights:",self.weights)
+        nextStateFeatures = self.getFeatures(obs)
+        self.totalRewards += reward
+        actions = self.getActions(obs)
+        #print("oldstate",self.oldState)
+        #print("reward",reward)
+        #print("sprime",sPrime)
+        #print("actions",actions)
+
+        self.update(self.currBestAction, reward, obs)
+
+    def alwaysFold(self):
+        return -1
+
+    def alwaysBetCall(self,obs):
+        return obs["call"]
+
+    def alwaysMaxRaise(self,obs):
+        return obs["max_raise"]
 
     def act(self, obs):
         
@@ -25,7 +218,7 @@ class TestingRLOmahaAgent(base.BaseAgent):
         else:
             return self.alwaysBetCall(obs)
 
-    '''
+'''
     #Actions are one of three things:
     #0) Call/check
     #1) Fold
@@ -116,7 +309,7 @@ class TestingRLOmahaAgent(base.BaseAgent):
         #print("sprime",sPrime)
         #print("actions",actions)
         self.update(self.oldState, reward, sPrime, actions, obs)
-    '''
+  
     def getActions(self,obs):
         #all of the possible actions include folding, calling, or raising
         #for a in range(obs["call"], obs["call"] + obs["max_raise"], 1):
@@ -127,7 +320,7 @@ class TestingRLOmahaAgent(base.BaseAgent):
         #print(actions)
         #print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
         return actions
-    '''
+
     def getFeatures(self,obs):
         featuresList = []
         print(obs)
@@ -181,4 +374,4 @@ class TestingRLOmahaAgent(base.BaseAgent):
         else:
             return self.alwaysBetCall(obs)
 
-        
+'''        
