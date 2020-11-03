@@ -3,83 +3,191 @@ import gym
 import clubs
 
 import random
+import numpy as np
+import time
 
 #GIT REPO WORKING
 
-env = gym.make("PotLimitOmahaTwoPlayer-v0")
+#env = gym.make("PotLimitOmahaTwoPlayer-v0")
 
 #print("PAST MAKING THE ENVIRONMENT")
 
 #env.register_agents([clubs.agent.baselineOmahaAgent.BaselineOmahaAgent()] *2)
-env.register_agents([clubs.agent.testingRLOmahaAgent.TestingRLOmahaAgent()] *2)
+#singleAgent = clubs.agent.testingRLOmahaAgent.TestingRLOmahaAgent()
+#env.register_agents([singleAgent,singleAgent])
+#env.register_agents([clubs.agent.testingRLOmahaAgent.TestingRLOmahaAgent()] *2)
 
 #print("AFTER REGISTERING AGENTS")
 
 #print(env.observation_space)
 
-print("observation space elements:")
-for i in env.observation_space:
-    print(i)
+#print("observation space elements:")
+#for i in env.observation_space:
+ #   print(i)
 
 
-obs = env.reset()
+#obs = env.reset()
 
-print("--------------------------------------")
-print("observations:")
-print(obs)
-print("--------------------------------------")
-print(obs["hole_cards"])
-print(obs["hole_cards"][0])
+#print("--------------------------------------")
+#print("observations:")
+#print(obs)
+#print("--------------------------------------")
+#print(obs["hole_cards"])
+#print("player 0 hold cards",obs["hole_cards"][0])
+#print("player 1 hold cards",obs["hole_cards"][1])
 #print(get_rank_class(obs["hole_cards"][0]))
 
 
-k = 10
+start_time = time.time()
 
-for i in range(k):
-    print(i)
-    #print("in range of iterations")
-    #print(obs)
-    while True:
-        #print("inside while loop")
-        bet = env.act(obs)
-        #print("just finished bet")
-        obs, rewards, done, info = env.step(bet)
-        #print("just finished step")
+#Xavier initialization
+thetaBetCheck = np.random.randn(119)/np.sqrt(119)
+thetaMaxRaise = np.random.randn(119)/np.sqrt(119)
+thetaFold = np.random.randn(119)/np.sqrt(119)
 
-        playerNumber = obs["action"]
-        #print("playernumber:", playerNumber)
-        #if (playerNumber >= 0):
-         #   print("within rewardUpdate step")
-            #env.agents[playerNumber].sayHello(playerNumber)
-        env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
-        
+#thetaBetCheck = 1/119 * np.ones(119)
+#thetaMaxRaise = 1/119 * np.ones(119)
+#thetaFold = 1/119 * np.ones(119)
+
+thetasPlayer0 = np.array([thetaBetCheck, thetaMaxRaise, thetaFold])
+thetasPlayer1 = np.array([thetaBetCheck, thetaMaxRaise, thetaFold])
+
+#REMEMBER env.reset() just deals a new hand. you don't start from the beginning
+
+
+
+#print("PAST MAKING THE ENVIRONMENT")
+
+#env.register_agents([clubs.agent.baselineOmahaAgent.BaselineOmahaAgent()] *2)
+singleAgent = clubs.agent.testingRLOmahaAgent.TestingRLOmahaAgent()
+
+singleAgent.setStartingThetas(thetasPlayer0)
+
+#TRAINING PHASE
+#number of nights/tasks to continuously run
+n = 2000
+wins = 0
+total = 0
+for j in range(n):
+    print("Game Night Number (Training): ", j)
+    env = gym.make("PotLimitOmahaTwoPlayer-v0")
+    env.register_agents([singleAgent,singleAgent])
+    obs = env.reset() #first hand of the night is dealt
+
+    k = 100 #number of games in 1 night = 1 task
+    #print(obs["stacks"])
+    noMoreStack = False
+    #print(thetasPlayer0[0])
+    for i in range(k): # Each i represents 1 of the 100 rounds of poker played in 1 night
+        #print("iteration number:",i)
+        #print("in range of iterations")
         #print(obs)
+    
+        while True:
 
-        #for (i, agent) in env.agents.items():
-        #    if obs["action"] == i: #obs[action] is the player
-         #       print(obs)
-         #       agent.sayHello(i)
-        #print("-------------------------")
-            #print(rewards[i])
-            #agent.setRewardandUpdate(rewards[i]) #i give it
+            bet = env.act(obs)
+            obs, rewards, done, info = env.step(bet)
+
+            if all(done):
+                break
+
+            if not np.all(obs["stacks"]):
+                noMoreStack = True
+                break
+
+
+            playerNumber = obs["action"]
+            #if playerNumber == 0:
+            env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
+
+            if playerNumber == 0:
+                thetasPlayer0 = env.agents[playerNumber].getThetas()
+            else:
+                thetasPlayer1 = env.agents[playerNumber].getThetas()
+
+        #at this point, if a player doesn't have any more chips, end the night (i.e. no more rounds for the night)
+        if not np.all(obs["stacks"]):
+                noMoreStack = True
+        if noMoreStack:
+            break
+        #print(obs['stacks'])
+        obs = env.reset()
+
+    #print("Current stack",obs["stacks"])
+    singleAgent.setStartingThetas(thetasPlayer0)
+    #print(singleAgent.getThetas())
+    #print("---------------------")
+
+    total += 1
+    if (obs["stacks"][0] > obs["stacks"][1]):
+        wins +=1
+    
+
+#print(thetasPlayer0)
+#print(thetasPlayer1)
+print(np.array_equal(thetasPlayer0,thetasPlayer1))
+print("Winning Night percentage (during training): ", wins/total)
+
+print("EVALUATING AGAINST RANDOM")
+
+trainedAgent = clubs.agent.testingRLOmahaAgent.TestingRLOmahaAgent()
+
+trainedAgent.setStartingThetas(singleAgent.getThetas())
+trainedAgent.setTrainingOff()
+
+#randomAgent = clubs.agent.baselineOmahaAgent.BaselineOmahaAgent()
+
+
+
+#number of nights/tasks to continuously run
+n = 500
+winsEvaluation = 0
+totalEvaluation = 0
+for j in range(n):
+    print("Game Night Number (Evaluation): --------------------------------------------", j)
+    env = gym.make("PotLimitOmahaTwoPlayer-v0")
+    env.register_agents([trainedAgent,trainedAgent])
+    obs = env.reset() #first hand of the night is dealt
+
+    k = 100 #number of games in 1 night = 1 task
+    #print(obs["stacks"])
+    #noMoreStack = False
+    #print(thetasPlayer0[0])
+    for i in range(k): # Each i represents 1 of the 100 rounds of poker played in 1 night
+        #print("iteration number:",i)
+        #print("in range of iterations")
+        #print(obs)
+    
+        while True:
+
+            bet = env.act(obs)
+            obs, rewards, done, info = env.step(bet)
+            #print(obs)
             
 
-        #print(obs)
-        #print("rewards: ", rewards)
+            if all(done):
+                break
 
-        #print(env.agents[0])
-        #env.agents[0].sayHello()
+            if not np.all(obs["stacks"]):
+                noMoreStack = True
+                break
+            #print(obs["stacks"])
 
-        if all(done):
+        #at this point, if a player doesn't have any more chips, end the night (i.e. no more rounds for the night)
+        if noMoreStack:
             break
 
-    #print(i)
-    #print("Current stack",obs["stacks"])
-    #print("------")
-    if (i == k-1): #the last iteration
-        print("Current stack",obs["stacks"])
-    obs = env.reset()
+        obs = env.reset()
+    #print(obs["stacks"])
+    totalEvaluation += 1
+    if (obs["stacks"][0] > obs["stacks"][1]):
+        winsEvaluation +=1
+    
+print("Winning Night percentage (during evaluation against random): ", winsEvaluation/totalEvaluation)
 
-print("Current stack",obs["stacks"])
+end_time = time.time()
+print("time it took:")
+print(end_time - start_time)
+
 
 

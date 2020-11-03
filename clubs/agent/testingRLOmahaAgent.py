@@ -18,10 +18,15 @@ class TestingRLOmahaAgent(base.BaseAgent):
     #actionSpace = [0,1,-1] #0 = call/check, #1 = max_raise, #-1 = fold
     gammaGlobal = 1
     gradientQ = 1
-    thetaBetCheck = np.ones(119)
-    thetaMaxRaise = np.ones(119)
-    thetaFold = np.ones(119)
+    thetaBetCheck = 1/119 * np.ones(119)
+    thetaMaxRaise = 1/119 * np.ones(119)
+    thetaFold = 1/119 * np.ones(119)
+    #thetaBetCheck = np.ones(119)
+    #thetaMaxRaise = np.ones(119)
+    #thetaFold = np.ones(119)
     alphaLearningRate = 0.2
+    training = True
+
 
     thetas = np.array([thetaBetCheck, thetaMaxRaise, thetaFold])
     previousStateFeatures = 1/13*np.ones(119)
@@ -29,6 +34,13 @@ class TestingRLOmahaAgent(base.BaseAgent):
     previousStateFeatures[1] = 200
     totalRewards = 0
     currBestAction = 0 #initialize our first action to bet/check
+    explorationProb = 0.7
+
+    def getThetas(self):
+        return self.thetas
+
+    def setStartingThetas(self, givenThetas):
+        self.thetas = givenThetas
 
     def getActions(self,obs):
         #[call/check, max_raise, fold]
@@ -55,6 +67,8 @@ class TestingRLOmahaAgent(base.BaseAgent):
         features.append(1)
         playerNumber = obs["action"]
         features.append(obs["stacks"][playerNumber])
+        #print("player number:", playerNumber)
+        #print("hole cards in getfeatures fxn",obs["hole_cards"])
 
         #print("we've appended the pot, and stack")
 
@@ -70,12 +84,15 @@ class TestingRLOmahaAgent(base.BaseAgent):
             for card in obs["hole_cards"]:
                 counter = 0
                 cardRank = self.get_card_number(card)
+                #print(card)
+                #print(cardRank)
+                #print("******")
                 while counter < 13:
-                    counter += 1
                     if counter == cardRank:
                         features.append(1)
                     else:
                         features.append(0)
+                    counter += 1
 
         #OUR FIVE COMMUNITY CARDS
         #print("setting community card features")
@@ -137,14 +154,22 @@ class TestingRLOmahaAgent(base.BaseAgent):
         #actionSpace = [0,1,2] #[bet/check, max_raise, fold]
         gamma = self.gammaGlobal
         featuresVector = self.getFeatures(obs)
+        #print("features Vector in update fxn:",featuresVector)
         alpha = self.alphaLearningRate
 
+        maxAction = -1
         u = -math.inf
+        #print("looping through the best Q value for all actions")
         for a in self.getActions(obs):
+            #print(a)
             currTheta = self.thetas[a]
+            #print(currTheta)
             currQValue = np.dot(currTheta, featuresVector)
+            #print(currQValue)
             if currQValue > u:
                 u = currQValue
+                maxAction = a
+                #print(u)
         
         #print("reward:",r)
         #print("gamma:",gamma)
@@ -163,39 +188,58 @@ class TestingRLOmahaAgent(base.BaseAgent):
         #Our scaling for the gradient is so that all elements add to one
         #ASK CHRIST ABOUT SCALING GRADIENT!!
 
-        toMultiply = np.min([1/np.linalg.norm(delta),1])*delta
-        self.thetas[a] += alpha * toMultiply
+        if np.any(delta):
+            toMultiply = np.min([1/np.linalg.norm(delta),1])*delta
+        else:
+            toMultiply = 1
+        self.thetas[maxAction] += alpha * toMultiply
     
 
     def chooseAction(self,stateFeatures, actions):
         #INCORPORATE EPSIOLON GREEDY PROBABILITY; code is below
-        maxQ = -math.inf
-        maxAction = 0 #corresponds to nothing
-        for a in actions:
-            print(a)
-            currTheta = self.thetas[a]
-            print("currTheta",currTheta)
-            currQValue = np.dot(currTheta, stateFeatures)
-            print("currQvalue:",currQValue)
-            if currQValue > maxQ:
-                maxQ = currQValue
-                maxAction = a
-        return maxAction
+        if random.random() < self.explorationProb:
+            return random.choice(actions)
+        else:
+            maxQ = -math.inf
+            maxAction = 0 #corresponds to nothing
+            for a in actions:
+                #print(a)
+                currTheta = self.thetas[a]
+                #print("currTheta",currTheta)
+                currQValue = np.dot(currTheta, stateFeatures)
+                #print("currQvalue:",currQValue)
+                if currQValue > maxQ:
+                    maxQ = currQValue
+                    maxAction = a
+            return maxAction
 
     def forwardRL(self,obs):
+        #print(self.thetas[0])
+        #print(self.thetas[1])
+        #print(self.thetas[2])
+        
+        #print(obs)
         #print("in forwardRL")
         actions = self.getActions(obs)
-        print(actions)
+        #print(actions)
         #print("past getActions")
         currentStateFeatures = self.getFeatures(obs)
-        print(currentStateFeatures)
+        #print(currentStateFeatures)
         #print("past get Features")
         self.previousStateFeatures = currentStateFeatures
         self.currBestAction = self.chooseAction(currentStateFeatures,actions)
         
         #print("finished getting best action in forwardRL")
-        print("current best action:", self.currBestAction)
-        return self.currBestAction
+        #print("current best action:", self.currBestAction)
+
+        actionForSimulator = -2
+        if self.currBestAction == 0: #check/calling
+            actionForSimulator = obs["call"]
+        elif self.currBestAction == 1: #max raise
+            actionForSimulator = obs["max_raise"]
+        else: #fold
+            actionForSimulator = -1 
+        return actionForSimulator
 
     def setRewardandUpdate(self, obs, reward):
         #print("weights:",self.weights)
@@ -206,6 +250,7 @@ class TestingRLOmahaAgent(base.BaseAgent):
         #print("reward",reward)
         #print("sprime",sPrime)
         #print("actions",actions)
+        #print("IN THE REWARD UPDATE FUNCTION------------------",self.currBestAction)
 
         self.update(self.currBestAction, reward, obs)
 
@@ -218,12 +263,63 @@ class TestingRLOmahaAgent(base.BaseAgent):
     def alwaysMaxRaise(self,obs):
         return obs["max_raise"]
 
-    def act(self, obs):
+    def chooseTrainedAction(self, stateFeatures, actions):
+        maxQ = -math.inf
+        maxAction = -1 #corresponds to nothing
+        for a in actions:
+            currTheta = self.thetas[a]
+            currQValue = np.dot(currTheta, stateFeatures)
+            if currQValue > maxQ:
+                maxQ = currQValue
+                maxAction = a
+        return maxAction
+
+    def bestTrainedAction(self, obs):
+        actions = self.getActions(obs)
+        currentStateFeatures = self.getFeatures(obs)
+        currBestAction = self.chooseTrainedAction(currentStateFeatures,actions)
         
-        if obs["action"] == 0: #player 1
-            return self.forwardRL(obs)
+        #print("finished getting best action in forwardRL")
+        #print("current best action:", self.currBestAction)
+
+        actionForSimulator = -2
+        if currBestAction == 0: #check/calling
+            actionForSimulator = obs["call"]
+        elif currBestAction == 1: #max raise
+            actionForSimulator = obs["max_raise"]
+        else: #fold
+            actionForSimulator = -1 
+        return actionForSimulator
+
+    def setTrainingOff(self):
+        self.training = False
+
+    def randomAction(self,obs):
+        action = random.random()
+        if action < 0.3: #fold
+            return -1
+        elif action < 0.6: # bet/call
+            return obs["call"]
         else:
-            return self.alwaysBetCall(obs)
+            return obs["max_raise"]
+
+    def act(self, obs):
+        if self.training:
+            if obs["action"] == 0: #player 1
+                #print("doing RL for player 0")
+                return self.forwardRL(obs)
+            else:
+                #print("doing RL for player 1")
+                #return self.randomAction(obs)
+                return self.forwardRL(obs)
+        else:
+            #return self.bestTrainedAction(obs)
+            
+            if obs["action"] == 0:
+                return self.bestTrainedAction(obs)
+            else:
+                return self.randomAction(obs)
+            
 
 '''
     #Actions are one of three things:
