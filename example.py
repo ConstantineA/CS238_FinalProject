@@ -65,16 +65,19 @@ singleAgent.setStartingThetas(thetasPlayer0)
 
 #TRAINING PHASE
 #number of nights/tasks to continuously run
-n = 2000
+n = 5000
+k = 100 #number of games in 1 night = 1 task
 wins = 0
 total = 0
 for j in range(n):
-    print("Game Night Number (Training): ", j)
+    #print("--------------------------------------")
+    if (j % 1000 == 0):
+        print("Game Night Number (Training): ", j)
     env = gym.make("PotLimitOmahaTwoPlayer-v0")
     env.register_agents([singleAgent,singleAgent])
     obs = env.reset() #first hand of the night is dealt
 
-    k = 100 #number of games in 1 night = 1 task
+    
     #print(obs["stacks"])
     noMoreStack = False
     #print(thetasPlayer0[0])
@@ -82,23 +85,38 @@ for j in range(n):
         #print("iteration number:",i)
         #print("in range of iterations")
         #print(obs)
-    
+
         while True:
+            #print(obs)
 
             bet = env.act(obs)
             obs, rewards, done, info = env.step(bet)
+            #print(obs)
+            #print(rewards)
 
             if all(done):
+                playerNumber = -1
+                for pos in range(2):
+                    if obs["active"][pos] == True:
+                        playerNumber = pos
+                #print(playerNumber)
+                #print(rewards)
+                env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
                 break
+
 
             if not np.all(obs["stacks"]):
                 noMoreStack = True
                 break
 
-
+            
+            #print("rewards: ", rewards)
             playerNumber = obs["action"]
+            inputReward = rewards[playerNumber]
+            #print("input rewards for player: ", playerNumber, "is:", inputReward)
             #if playerNumber == 0:
             env.agents[playerNumber].setRewardandUpdate(obs,rewards[playerNumber])
+            
 
             if playerNumber == 0:
                 thetasPlayer0 = env.agents[playerNumber].getThetas()
@@ -111,6 +129,8 @@ for j in range(n):
         if noMoreStack:
             break
         #print(obs['stacks'])
+        #print("END OF CURRENT GAME in the night ****************************************")
+        #print(obs["stacks"])
         obs = env.reset()
 
     #print("Current stack",obs["stacks"])
@@ -141,15 +161,19 @@ trainedAgent.setTrainingOff()
 
 #number of nights/tasks to continuously run
 n = 500
+k = 100 #number of games in 1 night = 1 task
 winsEvaluation = 0
 totalEvaluation = 0
+totalProfit = 0
+
 for j in range(n):
-    print("Game Night Number (Evaluation): --------------------------------------------", j)
+    if (j % 100 == 0):
+        print("Game Night Number (Evaluation): --------------------------------------------", j)
     env = gym.make("PotLimitOmahaTwoPlayer-v0")
     env.register_agents([trainedAgent,trainedAgent])
     obs = env.reset() #first hand of the night is dealt
 
-    k = 100 #number of games in 1 night = 1 task
+    #k = 100 #number of games in 1 night = 1 task
     #print(obs["stacks"])
     #noMoreStack = False
     #print(thetasPlayer0[0])
@@ -177,13 +201,20 @@ for j in range(n):
         if noMoreStack:
             break
 
+        #print(obs["stacks"])
         obs = env.reset()
+        
     #print(obs["stacks"])
     totalEvaluation += 1
     if (obs["stacks"][0] > obs["stacks"][1]):
         winsEvaluation +=1
+    totalProfit += obs["stacks"][0] - 200
+    #print("END OF CURRENT GAME")
     
 print("Winning Night percentage (during evaluation against random): ", winsEvaluation/totalEvaluation)
+print("Total profit: ", totalProfit)
+print("Profit per Game Night: ", totalProfit/n)
+print("Profit per individual game of Omaha: ", totalProfit/ (n*k))
 
 end_time = time.time()
 print("time it took:")

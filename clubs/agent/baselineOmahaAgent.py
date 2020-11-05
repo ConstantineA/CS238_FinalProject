@@ -24,7 +24,7 @@ class BaselineOmahaAgent(base.BaseAgent):
         #possible bet sizes + -1 for fold
         #betAction = [for i in range()]
         action = random.random()
-        if action < 0.3: #fold
+        if action < 0.1: #fold
             return -1
         elif action < 0.6: # bet/call
             return obs["call"]
