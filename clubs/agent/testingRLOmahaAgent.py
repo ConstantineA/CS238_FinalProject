@@ -505,10 +505,11 @@ class TestingRLOmahaAgent(base.BaseAgent):
             if obs["action"] == 0:
                 return self.bestTrainedAction(obs) #RL agent
                 #return self.optimalStrat(obs)
+                #return self.alwaysMaxRaise(obs)
             else:
-                return self.randomAction(obs)
+                #return self.randomAction(obs)
                 #return self.alwaysBetCall(obs)
                 #return self.alwaysMaxRaise(obs)
                 #return self.alwaysFold()
-
-                #return self.optimalStrat(obs)
+                #return self.bestTrainedAction(obs)
+                return self.optimalStrat(obs)
