@@ -63,8 +63,8 @@ class TestingRLOmahaAgent(base.BaseAgent):
     def getFeatures(self, obs):
         
         features = []
-        #features.append(obs["pot"])
-        features.append(1)
+        features.append(obs["pot"])
+        #features.append(1)
         playerNumber = obs["action"]
         features.append(obs["stacks"][playerNumber])
         #print("player number:", playerNumber)
@@ -303,6 +303,190 @@ class TestingRLOmahaAgent(base.BaseAgent):
         else:
             return obs["max_raise"]
 
+    top30HandsList = [ ['A','A','K','K'], ['A','A','J','T'], ['A','A','Q','Q'], ['A','A','J','J'], ['A','A','T','T'],
+                   ['A','A','9','9'], ['J','T','9','8'],
+                   ['K','K','Q','Q'], ['K','K','J','J'], ['K','Q','J','T'], ['K','K','T','T'], ['K','K','A','Q'],
+                   ['K','K','A','J'], ['K','K','A','T'], ['K','K','Q','J'], ['K','K','Q','T'], ['K','K','J','T'],
+                   ['Q','Q','J','J'], ['Q','Q','T','T'], ['Q','Q','A','K'], ['Q','Q','A','J'], ['Q','Q','A','T'],
+                   ['Q','Q','K','J'], ['Q','Q','K','T'], ['Q','Q','J','T'], ['Q','Q','J','9'], ['Q','Q','9','9'],
+                   ['J','J','T','T'], ['J','J','T','9']
+                 ]
+
+    high_face = ["T", "J", "Q", "K", "A"]
+    face = ["2","3","4","5","6","7","8","9", "T","J","Q","K","A"]
+
+    for i in range(len(face)):
+        for j in range(len(face)):
+            top30HandsList.append((["A", "A", face[i], face[j]]))
+
+    akxxs = []
+    for i in range(len(high_face)):
+        for j in range(len(face)):
+                akxxs.append((["A", "K", high_face[i], face[j]]))
+
+    highFourInARowList = [ ['5','6','7','8'], ['6','7','8','9'], ['7','8','9','T'], ['8','9','T','J'], ['9','T','J','Q'],
+                    ['T','J','Q','K'], ['J','Q','K','A']
+                    ]
+
+    lowFourInARowList = [ ['4','5','6','7'], ['5','6','7','8'], ['6','7','8','9'], ['7','8','9','T'], ['8','9','T','J'], 
+                        ['9','T','J','Q'],['T','J','Q','K'], ['J','Q','K','A'] ]
+
+    kkDoubleSuitedList = []
+    for i in range(len(face)):
+        for j in range(len(face)):
+            kkDoubleSuitedList.append((["K", "K", face[i], face[j]]))
+            
+            
+    # Hole Cards to Flop With
+    aqxxs = []
+    for i in range(len(high_face)):
+        for j in range(len(face)):
+                akxxs.append((["A", "Q", high_face[i], face[j]]))
+                    
+    axxxs = []
+    for i in range(len(face)):
+        for j in range(len(face)):
+            for k in range(len(face)):
+                axxxs.append((["A",face[i],face[j],face[k]]))
+
+    #BASELINE METHODS
+    #Assume no checking
+    #Random
+    #Max Bet
+    #Always Fold
+    #Always Call
+
+    #Three moves: Bet/Call, Fold, Raise
+
+
+    # suited as long as there are at least 2 of any one suit 
+    def checkSuited(self, suitList):
+        spadeCount = suitList.count(chr(9824)) 
+        heartCount = suitList.count(chr(9829))
+        diamondCount = suitList.count(chr(9830))
+        clubCount = suitList.count(chr(9827))
+        
+        if(spadeCount or heartCount or diamondCount or clubCount >= 2):
+            return True
+        else: 
+            return False
+        
+    # specifically check that if the hole cards contain an Ace, it is suited
+    def checkAceSuited(self, rankList,suitList):
+        rank_set = set(rankList) 
+        
+        ace_pos_list = [ i for i in range(len(rankList)) if rankList[i] == 'A' ]
+        #print(ace_pos_list)
+        
+        if 'A' in rank_set: 
+            ace_suit_list = [ suitList[i] for i in range(len(rankList)) if rankList[i] == 'A' ]
+            
+            for elem in ace_suit_list:
+                #print(elem)
+                if (suitList.count(elem) >= 2):
+                    return True
+            
+        else: 
+            return True
+        
+        
+    # double suited if no suit counts are zero or odd and sum of suit counts == 4
+    def checkDoubleSuited(self, suitList):
+        spadeCount = suitList.count(chr(9824))
+        heartCount = suitList.count(chr(9829))
+        diamondCount = suitList.count(chr(9830))
+        clubCount = suitList.count(chr(9827))
+        
+        if(
+        
+            2 in {spadeCount, heartCount, diamondCount, clubCount} and ((spadeCount + heartCount == 4) or 
+            (spadeCount + diamondCount == 4) or (spadeCount + clubCount == 4) or
+            (heartCount + diamondCount == 4) or (heartCount + clubCount == 4) or (diamondCount + clubCount == 4))
+            
+        ):
+            return True
+        else:
+            return False
+
+    # check if at least 2 cards from the hole cards are consecutive
+    def checkConnectedCards(self, rankList):
+        for elem in rankList:
+            idx = rankList.index(elem)
+            face_idx = self.face.index(elem)
+            
+            #if(self.face[face_idx + 1] in rankList):
+            if(self.face[face_idx] in rankList):
+                return True
+                
+            else:
+                return False
+
+
+
+        
+    # optimal strat
+    def optimalStrat(self, obs):
+
+        holeCards = obs["hole_cards"]
+
+        rankList = []
+        suitList = []
+
+        for card in holeCards:
+            rank_str = card.__str__()[0]
+            rankList.append(rank_str)
+        
+            suit_str = card.__str__()[1]
+            suitList.append(suit_str)
+        
+        #print("printing suitlist")
+        #print(suitList)
+        #print("rankList",rankList)
+        # When to Raise
+        if (self.checkDoubleSuited(suitList) == True):
+            #print("we've passed the first if test")
+            for elem in self.top30HandsList:
+                if(set(rankList) == set(elem)):
+                    return(obs["max_raise"])
+            for elem in self.kkDoubleSuitedList:
+                if(set(rankList) == set(elem)):
+                    return(obs["max_raise"])
+            for elem in self.highFourInARowList:
+                if(set(rankList) == set(elem)):
+                    return(obs["max_raise"])
+        
+        if(self.checkSuited(suitList) == True):
+            #print("we're in the second if test")
+            for elem in self.akxxs:
+                #print(elem)
+                if(set(rankList) == set(elem)):
+                    #print("WEVE PASSED THE SET = SET TEST")
+                    return(obs["max_raise"])
+            #print("were done with the for loop in the second if test")
+                
+        # When to"Limp"
+        if(self.checkAceSuited(rankList,suitList)):
+            #print("were in the third if test")
+            for elem in self.aqxxs:
+                if(set(rankList) == set(elem)):
+                    return(obs["call"])
+                
+            if(self.checkConnectedCards(rankList)):
+                for elem in self.axxxs:
+                    if(set(rankList) == set(elem)):
+                        return(obs["call"])
+        
+        if(self.checkAceSuited(rankList,suitList)==False and self.checkDoubleSuited(suitList)==False and self.checkSuited(suitList)==False):
+            #print("we're in the fourth if test")
+            for elem in self.lowFourInARowList:
+                if(set(rankList) == set(elem)):
+                    return(obs["call"])
+        
+        else: 
+            #print("we're folding according to optimal")
+            return self.alwaysFold()
+
+
     def act(self, obs):
         if self.training:
             if obs["action"] == 0: #player 1
@@ -312,169 +496,19 @@ class TestingRLOmahaAgent(base.BaseAgent):
                 #print("doing RL for player 1")
                 #return self.randomAction(obs)
                 return self.forwardRL(obs)
+                #return self.alwaysBetCall(obs)
+                #return self.alwaysMaxRaise(obs)
+                #return self.optimalStrat(obs)
         else:
             #return self.bestTrainedAction(obs)
             
             if obs["action"] == 0:
-                return self.bestTrainedAction(obs)
+                return self.bestTrainedAction(obs) #RL agent
+                #return self.optimalStrat(obs)
             else:
                 return self.randomAction(obs)
-            
+                #return self.alwaysBetCall(obs)
+                #return self.alwaysMaxRaise(obs)
+                #return self.alwaysFold()
 
-'''
-    #Actions are one of three things:
-    #0) Call/check
-    #1) Fold
-    #2) Max Raise
-    #Thus, there are only three actions that can be done.
-
-    alphaLearningRate = 0.2
-    discount = 1
-    weights = defaultdict(float)
-    explorationProb = 0.1
-
-    totalRewards = 0
-
-    currBestAction = 0 #assume starting best action is to call/check
-    oldState = []
-    
-    def getActions(self,obs):
-        #all of the possible actions include folding, calling, or raising
-        actions = [a for a in range(obs["call"], obs["call"] + obs["max_raise"], 1)]
-        actions.append(-1)
-        return actions
-
-    def getState(self,obs):
-        featuresList = []
-        #print("pot",obs["pot"])
-        featuresList.extend(obs["community_cards"])
-        featuresList.extend(obs["hole_cards"])
-        #print(featuresList)
-        featuresList.append(obs["pot"])
-        #print("pot",obs["pot"])
-        #print(featuresList)
-
-        return featuresList
-
-    def getQValue(self, state, a):
-        #the tuple (state,a) is used as the key for the defaultdictionary
-        #print("state:", state)
-        #print("action:", a)
-        state.append(a)
-        #print("state with action:", state)
-        key = tuple(state)
-        #print("key: ", key)
-
-        #print("weights:", self.weights)
-        return self.weights[key]
-
-
-    def chooseAction(self, state, actions):
-        if random.random() < self.explorationProb:
-            return random.choice(actions)
-        else:
-            maxAction = 0 #default is to check/call 
-            maxQ = -math.inf
-            for a in actions:
-                currVal = self.getQValue(state, a)
-                if currVal > maxQ:
-                    maxQ = currVal
-                    maxAction = a
-            return maxAction
-
-    def forwardRL(self,obs):
-        actions = self.getActions(obs)
-        state = self.getState(obs)
-        self.oldState = state
-
-        self.currBestAction = self.chooseAction(state,actions)
-        return self.currBestAction
-
-
-    def update(self,state, reward, sPrime, actions, obs):
-        newQ = 0
-        for a in actions:
-            q = self.getQValue(sPrime, a)
-            if q > newQ:
-                newQ = q
-        #TAKE A LOOK AT THIS ALGORITHM, MIGHT BE WRONG
-        updateValue = self.alphaLearningRate * (reward + self.discount*(newQ - self.getQValue(state,self.currBestAction)))
-        #self.weights[self.getState(state,self.currBestAction)] += updateValue
-        self.weights[tuple(self.getState(obs))] += updateValue
-
-    def setRewardandUpdate(self, obs, reward):
-        #print("weights:",self.weights)
-        sPrime = self.getState(obs)
-        self.totalRewards += reward
-        actions = self.getActions(obs)
-        #print("oldstate",self.oldState)
-        #print("reward",reward)
-        #print("sprime",sPrime)
-        #print("actions",actions)
-        self.update(self.oldState, reward, sPrime, actions, obs)
-  
-    def getActions(self,obs):
-        #all of the possible actions include folding, calling, or raising
-        #for a in range(obs["call"], obs["call"] + obs["max_raise"], 1):
-            #print(a)
-        actions = [a for a in range(obs["call"], obs["call"] + obs["max_raise"], 1)]
-        
-        actions.append(-1)
-        #print(actions)
-        #print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-        return actions
-
-    def getFeatures(self,obs):
-        featuresList = []
-        print(obs)
-        featuresList.append(obs["community_cards"])
-        featuresList.append(obs["hole_cards"])
-        featuresList.append(obs["pot"])
-
-        return featuresList
-   
-
-    def reverseRL(self,obs):
-        return -1
-
-    
-    def random(self,obs):
-        #TODO
-        #later on, maybe create an array with all of the
-        #possible bet sizes + -1 for fold
-        #betAction = [for i in range()]
-        action = random.random()
-        if action < 0.3: #fold
-            return -1
-        elif action < 0.6: # bet/call
-            return obs["call"]
-
-    def alwaysFold(self):
-        return -1
-
-    def alwaysBetCall(self,obs):
-        return obs["call"]
-
-    def alwaysMaxRaise(self,obs):
-        return obs["max_raise"]
-
-
-    def sayHello(self, i):
-        print("hello world, i'm agent number:", i)
-
-    def act(self, obs):
-        
-        
-        #if obs["action"] == 0:
-         #   return self.alwaysMaxRaise(obs)
-        #else:
-         #   return self.alwaysBetCall(obs)
-
-
-        
-        if obs["action"] == 0: #player 1
-            return self.forwardRL(obs)
-        else:
-            return self.alwaysBetCall(obs)
-
-'''        
+                #return self.optimalStrat(obs)
